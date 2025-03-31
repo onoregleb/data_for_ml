@@ -2,3 +2,6 @@
 .idea/
 __pycache__
 .ipynb_checkpoints/
+data_api.csv
+merged_dataset.csv
+vacancies.csv
