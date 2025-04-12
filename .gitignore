@@ -5,3 +5,4 @@ __pycache__
 data_api.csv
 merged_dataset.csv
 vacancies.csv
+final_dataset.csv
