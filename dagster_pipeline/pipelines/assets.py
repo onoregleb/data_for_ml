@@ -11,30 +11,36 @@ from dagster_pipeline.processing.feature_engineering import engineer_features
 @asset(required_resource_keys={"sqlite_resource"})
 def getmatch_data(context: AssetExecutionContext):
     db = context.resources.sqlite_resource
-    return getmatch_scrape(db)
-
+    getmatch_scrape(db)
+    return None
 
 
 @asset(required_resource_keys={"sqlite_resource"})
 def hh_data(context: AssetExecutionContext):
     db = context.resources.sqlite_resource
     hh_scrape(db)
+    return None
 
 
-@asset
-def merged_data(getmatch_data, hh_data):
-    return merge_datasets(getmatch_data, hh_data)
+@asset(required_resource_keys={"sqlite_resource"})
+def merged_data(context: AssetExecutionContext, getmatch_data, hh_data):
+    db = context.resources.sqlite_resource
+    return merge_datasets(db)
 
-@asset
-def cleaned_data(merged_data):
-    return clean_data(merged_data)
+
+@asset(required_resource_keys={"sqlite_resource"})
+def cleaned_data(context: AssetExecutionContext, merged_data):
+    db = context.resources.sqlite_resource
+    return clean_data(db)
+
 
 @asset(required_resource_keys={"sqlite_resource"})
 def processed_data(context: AssetExecutionContext, cleaned_data):
     features_df = engineer_features(cleaned_data)
     db = context.resources.sqlite_resource
-    db.save_dataframe(features_df, table_name="processed_data")  # пример
+    db.save_dataframe(features_df, table_name="processed_data")
     return features_df
+
 
 __all_assets__ = [
     getmatch_data,
