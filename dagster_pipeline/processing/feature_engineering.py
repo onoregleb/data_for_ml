@@ -4,37 +4,29 @@ from sklearn.model_selection import KFold
 
 
 def engineer_features(db_handler):
-    # Загрузка данных
     df = db_handler.read_sql("SELECT * FROM merged_vacancies")
 
-    # Преобразование зарплатных полей
     df['salary_from'] = pd.to_numeric(df['salary_from'], errors='coerce')
     df['salary_to'] = pd.to_numeric(df['salary_to'], errors='coerce')
 
-    # Заполнение пропусков
     df['salary_to'] = df['salary_to'].fillna(df['salary_from'])
     df.dropna(subset=['salary_from', 'salary_to'], inplace=True)
 
-    # Расчет средней зарплаты
     df['salary_mean'] = (df['salary_from'] + df['salary_to']) / 2
 
-    # Замена пробелов в категориальных признаках и удаление лишних пробелов
     df['schedule'] = df['schedule'].str.replace(' ', '_').str.strip()
     df['employment'] = df['employment'].str.replace(' ', '_').str.strip()
     df['salary_currency'] = df['salary_currency'].str.replace(' ', '_').str.strip()
 
-    # One-Hot Encoding
     categorical_features = ['salary_currency', 'schedule', 'employment']
     df = pd.get_dummies(df,
                         columns=categorical_features,
                         prefix=['curr', 'sched', 'employ'])
 
-    # Кодирование опыта
     exp_map = {'Нет_опыта': 0, 'От_1_года_до_3_лет': 1, 'От_3_до_6_лет': 2}
     df['experience'] = df['experience'].str.replace(' ', '_').str.strip()
     df['experience_level'] = df['experience'].map(exp_map).fillna(-1).astype(int)
 
-    # Target Encoding функций
     def create_target_encoding(series, target_series):
         kf = KFold(n_splits=5, shuffle=True, random_state=42)
         encoded = pd.Series(np.zeros(len(series)), index=series.index)
@@ -48,11 +40,9 @@ def engineer_features(db_handler):
 
         return encoded.fillna(global_mean)
 
-    # Применение кодировок
     df['job_title_encoded'] = create_target_encoding(df['name'], df['salary_mean'])
     df['region_encoded'] = create_target_encoding(df['area_name'], df['salary_mean'])
 
-    # Smoothed Encoding для работодателя
     def create_smoothed_encoding(series, target_series, weight=10):
         global_mean = target_series.mean()
         group_means = target_series.groupby(series).mean()
@@ -62,7 +52,6 @@ def engineer_features(db_handler):
 
     df['employer_encoded'] = create_smoothed_encoding(df['employer_name'], df['salary_mean'])
 
-    # Формирование финального датасета
     final_columns = [
         'id', 'salary_mean',
         'curr_RUR',
@@ -75,7 +64,6 @@ def engineer_features(db_handler):
         'region_encoded', 'employer_encoded'
     ]
 
-    # Заполнение отсутствующих колонок нулями
     for col in final_columns:
         if col not in df.columns:
             df[col] = 0
