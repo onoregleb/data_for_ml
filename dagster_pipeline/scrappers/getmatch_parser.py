@@ -69,7 +69,7 @@ def parse_salary(salary_str: str):
     original_salary_str = salary_str
 
     salary_str = salary_str.replace('\u200d', '').replace('—', '-').replace('–', '-')
-    salary_str = salary_str.replace(' ', '')  # Убираем пробелы
+    salary_str = salary_str.replace(' ', '')
 
     salary_from, salary_to, currency = None, None, 'RUR'  # По умолчанию рублики
 
@@ -227,7 +227,7 @@ def scrape_page(url, start_id):
         parsed_vacancy = parse_vacancy_card(vacancy, start_id)
         if parsed_vacancy:
             parsed_vacancies.append(parsed_vacancy)
-            start_id += 1  # Увеличиваем ID для следующей вакансии
+            start_id += 1
 
     return parsed_vacancies, start_id
 

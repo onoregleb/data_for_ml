@@ -23,11 +23,9 @@ def fetch_vacancies(params, max_pages=20, per_page=100):
             if "items" in page_data and page_data["items"]:
                 all_vacancies.extend(page_data["items"])
 
-            # Логгирование каждых 10 страниц
             if (page + 1) % 10 == 0:
                 print(f"Обработано {page + 1} страниц.")
 
-            # Если на странице нет вакансий, завершаем сбор
             if not page_data["items"]:
                 print(f"Страница {page} не содержит вакансий. Завершаем сбор.")
                 break

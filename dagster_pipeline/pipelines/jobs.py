@@ -1,5 +1,5 @@
 from dagster import Definitions, define_asset_job, AssetSelection
-from .assets import getmatch_data, hh_data, cleaned_data, merged_data, processed_data
+from .assets import getmatch_data, hh_data, cleaned_data, merged_data, processed_data, train_model
 from dagster_pipeline.pipelines.resources import sqlite_resource
 
 assets = [
@@ -7,7 +7,8 @@ assets = [
     hh_data,
     cleaned_data,
     merged_data,
-    processed_data
+    processed_data,
+    train_model
 ]
 
 data_pipeline = define_asset_job(

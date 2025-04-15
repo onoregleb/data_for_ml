@@ -70,7 +70,6 @@ class SQLiteHandler:
 
         df = df.drop_duplicates(subset='id')
 
-        # Получаем список колонок таблицы
         cursor = self.conn.cursor()
         cursor.execute(f"PRAGMA table_info({table})")
         table_columns = [row[1] for row in cursor.fetchall()]

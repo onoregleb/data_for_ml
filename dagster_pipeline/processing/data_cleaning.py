@@ -2,19 +2,18 @@ import sys
 sys.path.append("C:/Users/Gleb Onore/Desktop/data_for_ml/dagster_pipeline")
 
 import pandas as pd
+from dagster_pipeline.utils.salary_converter import convert_salary_to_rur
 
 
 def merge_datasets(db_handler):
     merged_df = db_handler.read_sql("SELECT * FROM vacancies")
 
-    # Нормализация area_name
     merged_df['area_name'] = merged_df['area_name'].replace({
         "Полная удаленка": "Удалённая работа",
         "Можно удалённо из РФ": "Удалённая работа"
     })
 
-    # Конвертация валют
-    from dagster_pipeline.utils.salary_converter import convert_salary_to_rur
+
     merged_df[['salary_from', 'salary_to', 'salary_currency']] = merged_df.apply(
         convert_salary_to_rur, axis=1
     )
@@ -29,11 +28,9 @@ def clean_data(db_handler):
 
     df = db_handler.read_sql("SELECT * FROM 'merged_vacancies'")
 
-    # Заполнение salary_to, если salary_from есть
     condition = (df['salary_from'].notna()) & (df['salary_to'].isna())
     df.loc[condition, 'salary_to'] = df.loc[condition, 'salary_from']
 
-    # Импутация
     exp_map = {
         'Нет опыта': 0,
         'От 1 года до 3 лет': 1,
@@ -97,5 +94,4 @@ def clean_data(db_handler):
     ]
     df = df.drop(columns=columns_to_drop, errors='ignore')
 
-    # Сохраняем в БД
     db_handler.insert_data(df, "cleaned_vacancies")

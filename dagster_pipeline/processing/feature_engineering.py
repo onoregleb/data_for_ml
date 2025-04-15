@@ -57,7 +57,7 @@ def engineer_features(db_handler):
         'curr_RUR',
         'sched_Гибкий_график', 'sched_Полный_день',
         'sched_Сменный_график', 'sched_Удаленная_работа',
-        'sched_Вахтовый_метод', # Добавлена колонка
+        'sched_Вахтовый_метод',
         'employ_Полная_занятость', 'employ_Проектная_работа',
         'employ_Стажировка', 'employ_Частичная_занятость',
         'experience_level', 'job_title_encoded',
