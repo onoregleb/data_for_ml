@@ -9,21 +9,42 @@ class SQLiteHandler:
     def create_tables(self):
         cursor = self.conn.cursor()
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS vacancies (
-                id TEXT PRIMARY KEY,
-                name TEXT,
-                salary_from REAL,
-                salary_to REAL,
-                salary_currency TEXT,
-                employer_name TEXT,
-                published_at TEXT,
-                area_name TEXT,
-                schedule TEXT,
-                employment TEXT,
-                experience TEXT,
-                alternate_url TEXT
-            )
-        ''')
+                CREATE TABLE IF NOT EXISTS vacancies (
+                    id TEXT PRIMARY KEY,
+                    name TEXT,
+                    salary_from REAL,
+                    salary_to REAL,
+                    salary_currency TEXT,
+                    employer_name TEXT,
+                    published_at TEXT,
+                    area_name TEXT,
+                    schedule TEXT,
+                    employment TEXT,
+                    experience TEXT,
+                    alternate_url TEXT
+                )
+            ''')
+        cursor.execute('''
+                CREATE TABLE IF NOT EXISTS merged_vacancies (
+                    id TEXT PRIMARY KEY,
+                    name TEXT,
+                    salary_from REAL,
+                    salary_to REAL,
+                    salary_currency TEXT,
+                    employer_name TEXT,
+                    published_at TEXT,
+                    area_name TEXT,
+                    schedule TEXT,
+                    employment TEXT,
+                    experience TEXT,
+                    alternate_url TEXT,
+                    salary_mean REAL,
+                    experience_encoded INTEGER,
+                    job_title_encoded REAL,
+                    region_encoded REAL,
+                    employer_encoded REAL
+                )
+            ''')
         self.conn.commit()
 
     def insert_data(self, df: pd.DataFrame, table: str):

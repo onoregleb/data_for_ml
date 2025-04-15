@@ -36,10 +36,8 @@ def cleaned_data(context: AssetExecutionContext, merged_data):
 
 @asset(required_resource_keys={"sqlite_resource"})
 def processed_data(context: AssetExecutionContext, cleaned_data):
-    features_df = engineer_features(cleaned_data)
     db = context.resources.sqlite_resource
-    db.save_dataframe(features_df, table_name="processed_data")
-    return features_df
+    return engineer_features(db)
 
 
 __all_assets__ = [
