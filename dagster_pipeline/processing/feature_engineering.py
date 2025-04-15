@@ -1,55 +1,88 @@
-import sys
-sys.path.append("C:/Users/Gleb Onore/Desktop/data_for_ml/dagster_pipeline")
-
-from dagster_pipeline.database.sqlite_handler import SQLiteHandler
-import numpy as np
 import pandas as pd
-from sklearn.impute import KNNImputer
+import numpy as np
+from sklearn.model_selection import KFold
+
 
 def engineer_features(db_handler):
+    # Загрузка данных
     df = db_handler.read_sql("SELECT * FROM merged_vacancies")
 
-    # Заполнение salary_to при наличии только salary_from
-    condition = (df['salary_from'].notna()) & (df['salary_to'].isna())
-    df.loc[condition, 'salary_to'] = df.loc[condition, 'salary_from']
+    # Преобразование зарплатных полей
+    df['salary_from'] = pd.to_numeric(df['salary_from'], errors='coerce')
+    df['salary_to'] = pd.to_numeric(df['salary_to'], errors='coerce')
 
-    # Классификация качества зарплатных данных
-    df['salary_data_quality'] = np.where(
-        df['salary_from'].notna() & df['salary_to'].notna(), 'full',
-        np.where(df['salary_from'].notna(), 'only_from', 'estimated')
-    )
+    # Заполнение пропусков
+    df['salary_to'] = df['salary_to'].fillna(df['salary_from'])
+    df.dropna(subset=['salary_from', 'salary_to'], inplace=True)
 
-    # Кодировка опыта
-    exp_map = {
-        'Нет опыта': 0,
-        'От 1 года до 3 лет': 1,
-        'От 3 до 6 лет': 2,
-        'Более 6 лет': 3
-    }
-    df['experience_encoded'] = df['experience'].map(exp_map)
+    # Расчет средней зарплаты
+    df['salary_mean'] = (df['salary_from'] + df['salary_to']) / 2
 
-    # One-hot для графика работы
-    schedule_dummies = pd.get_dummies(df['schedule'], prefix='schedule')
-    df = pd.concat([df, schedule_dummies], axis=1)
+    # Замена пробелов в категориальных признаках и удаление лишних пробелов
+    df['schedule'] = df['schedule'].str.replace(' ', '_').str.strip()
+    df['employment'] = df['employment'].str.replace(' ', '_').str.strip()
+    df['salary_currency'] = df['salary_currency'].str.replace(' ', '_').str.strip()
 
-    # Импутация KNN
-    columns_for_imputation = ['salary_from', 'salary_to', 'experience_encoded']
-    imputer = KNNImputer(n_neighbors=10)
-    df[columns_for_imputation] = imputer.fit_transform(df[columns_for_imputation])
+    # One-Hot Encoding
+    categorical_features = ['salary_currency', 'schedule', 'employment']
+    df = pd.get_dummies(df,
+                        columns=categorical_features,
+                        prefix=['curr', 'sched', 'employ'])
 
-    # Обратное преобразование опыта
-    inv_exp_map = {v: k for k, v in exp_map.items()}
-    df['experience'] = df['experience_encoded'].round().astype(int).map(inv_exp_map)
+    # Кодирование опыта
+    exp_map = {'Нет_опыта': 0, 'От_1_года_до_3_лет': 1, 'От_3_до_6_лет': 2}
+    df['experience'] = df['experience'].str.replace(' ', '_').str.strip()
+    df['experience_level'] = df['experience'].map(exp_map).fillna(-1).astype(int)
 
-    # Удаление вспомогательных столбцов
-    columns_to_drop = [
-        'salary_data_quality',
-        'experience_encoded',
-        'schedule_Гибкий график',
-        'schedule_Полный день',
-        'schedule_Сменный график',
-        'schedule_Удаленная работа'
+    # Target Encoding функций
+    def create_target_encoding(series, target_series):
+        kf = KFold(n_splits=5, shuffle=True, random_state=42)
+        encoded = pd.Series(np.zeros(len(series)), index=series.index)
+        global_mean = target_series.mean()
+
+        for train_idx, val_idx in kf.split(series):
+            train_series = series.iloc[train_idx]
+            train_target = target_series.iloc[train_idx]
+            group_means = train_target.groupby(train_series).mean()
+            encoded.iloc[val_idx] = series.iloc[val_idx].map(group_means).fillna(global_mean)
+
+        return encoded.fillna(global_mean)
+
+    # Применение кодировок
+    df['job_title_encoded'] = create_target_encoding(df['name'], df['salary_mean'])
+    df['region_encoded'] = create_target_encoding(df['area_name'], df['salary_mean'])
+
+    # Smoothed Encoding для работодателя
+    def create_smoothed_encoding(series, target_series, weight=10):
+        global_mean = target_series.mean()
+        group_means = target_series.groupby(series).mean()
+        group_counts = series.value_counts()
+        smoothed = (group_counts * group_means + weight * global_mean) / (group_counts + weight)
+        return series.map(smoothed).fillna(global_mean)
+
+    df['employer_encoded'] = create_smoothed_encoding(df['employer_name'], df['salary_mean'])
+
+    # Формирование финального датасета
+    final_columns = [
+        'id', 'salary_mean',
+        'curr_RUR',
+        'sched_Гибкий_график', 'sched_Полный_день',
+        'sched_Сменный_график', 'sched_Удаленная_работа',
+        'sched_Вахтовый_метод', # Добавлена колонка
+        'employ_Полная_занятость', 'employ_Проектная_работа',
+        'employ_Стажировка', 'employ_Частичная_занятость',
+        'experience_level', 'job_title_encoded',
+        'region_encoded', 'employer_encoded'
     ]
-    df.drop(columns=columns_to_drop, inplace=True, errors='ignore')
 
-    db_handler.insert_data(df, "cleaned_vacancies")
+    # Заполнение отсутствующих колонок нулями
+    for col in final_columns:
+        if col not in df.columns:
+            df[col] = 0
+
+    # Приведение типов
+    final_cols_to_int = [col for col in final_columns if col.startswith('curr_') or col.startswith('sched_') or col.startswith('employ_')]
+    df[final_cols_to_int] = df[final_cols_to_int].astype(int)
+
+    # Сохранение
+    db_handler.insert_data(df[final_columns], "features_for_model")
